@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Stack Rush</title>
 <meta name="theme-color" content="#0f1226">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Stack Rush">
 <!-- Logo de l'onglet (favicon), intégré dans le fichier : pas besoin d'image séparée -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f1226'/%3E%3Crect x='12' y='40' width='40' height='11' rx='3' fill='%2336d1dc'/%3E%3Crect x='18' y='28' width='32' height='11' rx='3' fill='%235b86e5'/%3E%3Crect x='24' y='16' width='24' height='11' rx='3' fill='%23ff5f6d'/%3E%3C/svg%3E">
 
@@ -34,7 +39,9 @@
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
   #stage{position:relative}
   canvas{display:block;border-radius:12px;background:linear-gradient(#1b2150,#0f1226)}
-  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;background:rgba(10,12,30,.72);border-radius:12px;padding:20px}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;text-align:center;background:rgba(10,12,30,.72);border-radius:12px;padding:20px;overflow-y:auto}
+  .overlay>:first-child{margin-top:auto}
+  .overlay>:last-child{margin-bottom:auto}
   .hidden{display:none!important}
   h1{margin:0;font-size:40px;letter-spacing:1px}
   h2{margin:0;font-size:30px}
@@ -78,6 +85,16 @@
   #lbList .av{vertical-align:middle}
   img.av{border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.8);background:#222}
   img.av.sad{filter:grayscale(.7) brightness(.8)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:330px}
+  .row button.small{min-width:150px;padding:10px 8px;font-size:14px}
+  .world{width:100%}
+  .world .wn{font-size:13px;opacity:.9;margin-bottom:4px;text-align:left}
+  .lvls{display:flex;gap:6px;justify-content:center}
+  .lv{min-width:0;width:52px;height:52px;padding:0;font-size:18px;border-radius:12px;line-height:1.1}
+  .lv small{display:block;font-size:10px;color:#ffd86b;min-height:11px}
+  .lv.locked{background:rgba(255,255,255,.1);opacity:.5;cursor:default}
+  .lv.done{background:linear-gradient(135deg,#36d1dc,#5b86e5)}
+  #lvlTag{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:13px;opacity:.7;pointer-events:none}
 </style>
 </head>
 <body>
@@ -86,6 +103,7 @@
     <canvas id="c"></canvas>
     <div id="hud">0</div>
     <div id="combo"></div>
+    <div id="lvlTag"></div>
     <div id="hudAv"></div>
     <button id="btnMusic" title="Musique">🔊</button>
 
@@ -94,10 +112,14 @@
       <p>Tape au bon moment pour empiler les blocs.<br>Plus c'est précis, plus ta tour grandit !</p>
       <p id="pseudoShow" style="font-weight:700;font-size:20px"></p>
       <p id="bestStart"></p>
-      <button id="btnPlay">JOUER</button>
-      <button id="btnLbStart" class="ghost small">🏆 Classement</button>
-      <button id="btnMusStart" class="ghost small">🎵 Choisir la musique</button>
-      <button id="btnChangeName" class="ghost small">✏️ Pseudo & avatar</button>
+      <button id="btnPlay">▶ NIVEAUX</button>
+      <div class="row">
+        <button id="btnEndless" class="ghost small">♾️ Mode infini</button>
+        <button id="btnLbStart" class="ghost small">🏆 Classement</button>
+        <button id="btnMusStart" class="ghost small">🎵 Musique</button>
+        <button id="btnChangeName" class="ghost small">✏️ Pseudo & avatar</button>
+        <button id="btnInstall" class="alt small">📲 Installer le jeu</button>
+      </div>
       <p style="font-size:13px;margin-top:6px">Thème</p>
       <div id="themes"></div>
       <p style="font-size:11px;opacity:.6;margin-top:6px"><a href="confidentialite.html" target="_blank" rel="noopener" style="color:#fff">Politique de confidentialité</a></p>
@@ -110,9 +132,28 @@
       <p id="bestOver"></p>
       <button id="btnRevive" class="alt">▶ Revivre (voir une pub)</button>
       <button id="btnReplay">REJOUER</button>
-      <button id="btnShare" class="ghost small">Partager mon score</button>
-      <button id="btnLbOver" class="ghost small">🏆 Classement</button>
-      <button id="btnMusOver" class="ghost small">🎵 Choisir la musique</button>
+      <div class="row">
+        <button id="btnShare" class="ghost small">Partager mon score</button>
+        <button id="btnMapOver" class="ghost small">🗺️ Niveaux</button>
+        <button id="btnLbOver" class="ghost small">🏆 Classement</button>
+        <button id="btnMusOver" class="ghost small">🎵 Musique</button>
+      </div>
+    </div>
+
+    <div id="map" class="overlay hidden">
+      <h2>🗺️ Niveaux</h2>
+      <p id="mapInfo" style="font-size:13px"></p>
+      <div id="mapList" style="width:100%;display:flex;flex-direction:column;gap:10px"></div>
+      <button id="btnMapBack" class="ghost small">RETOUR</button>
+    </div>
+
+    <div id="win" class="overlay hidden">
+      <h2 id="winTitle">Niveau réussi !</h2>
+      <div id="winAv"></div>
+      <div class="big" id="winStars">⭐⭐⭐</div>
+      <p id="winInfo"></p>
+      <button id="btnNext">NIVEAU SUIVANT</button>
+      <button id="btnWinMap" class="ghost small">🗺️ Niveaux</button>
     </div>
 
     <div id="lb" class="overlay hidden">
@@ -206,6 +247,23 @@ function beep(freq, dur = 0.08, type = 'sine', vol = 0.08) {
 }
 
 /* ================= ÉTAT DU JEU ================= */
+/* ---- Niveaux : 4 mondes de 5 niveaux (le monde suivant s'ouvre quand les 5 niveaux du précédent sont réussis) ---- */
+const WORLDS = [{ n: 'Néon', th: 0 }, { n: 'Sunset', th: 1 }, { n: 'Forêt', th: 2 }, { n: 'Bonbon', th: 3 }];
+const PER_WORLD = 5, LEVELS = 20;
+const worldOf = n => Math.floor((n - 1) / PER_WORLD);
+const lvlTarget = n => 6 + n * 2;                    // blocs à empiler pour réussir
+const lvlSpeed = n => 110 + n * 9;                   // vitesse de départ
+const lvlWidth = n => START_W - worldOf(n) * 18;     // le bloc de départ rétrécit à chaque monde
+let mode = 'level', curLevel = 1, perfects = 0, adCount = 0;
+let lvlDone = 0, lvlStars = {};
+try {
+  lvlDone = Math.max(0, Math.min(LEVELS, parseInt(localStorage.getItem('stackrush_lvl') || '0', 10) || 0));
+  lvlStars = JSON.parse(localStorage.getItem('stackrush_stars') || '{}') || {};
+} catch (e) {}
+function saveLevels() {
+  try { localStorage.setItem('stackrush_lvl', String(lvlDone)); localStorage.setItem('stackrush_stars', JSON.stringify(lvlStars)); } catch (e) {}
+}
+function themeNow() { return mode === 'level' ? WORLDS[worldOf(curLevel)].th : themeIdx; }
 let state = 'ready';     // ready | play | over | ad
 let blocks, moving, pieces = [], score = 0, combo = 0, cam = 0, dir = 1, revived = false, gamesPlayed = 0, flash = 0;
 
@@ -218,9 +276,9 @@ const THEMES = [
 ];
 let themeIdx = 0;
 try { themeIdx = (parseInt(localStorage.getItem('stackrush_theme') || '0', 10) || 0) % THEMES.length; } catch (e) {}
-const hue = i => { const t = THEMES[themeIdx]; return t.h0 + t.span * (0.5 + 0.5 * Math.sin(i * 0.3)); };
+const hue = i => { const t = THEMES[themeNow()]; return t.h0 + t.span * (0.5 + 0.5 * Math.sin(i * 0.3)); };
 function applyTheme() {
-  const t = THEMES[themeIdx];
+  const t = THEMES[themeNow()];
   cv.style.background = `linear-gradient(${t.bg[0]},${t.bg[1]})`;
   document.querySelectorAll('.sw').forEach((b, k) => b.classList.toggle('on', k === themeIdx));
 }
@@ -235,11 +293,14 @@ applyTheme();
 const yOf = i => H - 150 - (i - cam) * BH;
 
 function newGame() {
-  blocks = [{ x: (W - START_W) / 2, w: START_W, i: 0 }];
+  const sw0 = mode === 'level' ? lvlWidth(curLevel) : START_W;
+  blocks = [{ x: (W - sw0) / 2, w: sw0, i: 0 }]; perfects = 0; applyTheme();
   pieces = []; score = 0; combo = 0; cam = 0; dir = 1; revived = false;
   spawn();
-  hud.textContent = '0'; comboEl.textContent = ''; setHudAv('');
+  hud.textContent = mode === 'level' ? '0/' + lvlTarget(curLevel) : '0'; comboEl.textContent = ''; setHudAv('');
+  $('lvlTag').textContent = mode === 'level' ? 'Niveau ' + curLevel + ' · Monde ' + WORLDS[worldOf(curLevel)].n : 'Mode infini';
   track('partie-jouee', 'Partie jouée');
+  if (mode === 'level') track('niveau-' + curLevel, 'Niveau ' + curLevel);
   state = 'play';
 }
 
@@ -248,7 +309,10 @@ function spawn() {
   moving = { x: dir > 0 ? 0 : W - top.w, w: top.w, i: blocks.length, dir: dir };
 }
 
-function speed() { return 150 + Math.min(score * 5, 280); }   // px / seconde
+function speed() {
+  if (mode === 'level') return lvlSpeed(curLevel) + Math.min(score * 3, 90);
+  return 150 + Math.min(score * 5, 280);
+}   // px / seconde
 
 /* ================= EFFETS VISUELS ================= */
 let particles = [], floats = [], rings = [], shake = 0;
@@ -289,8 +353,8 @@ function drop() {
 
   let nx, nw;
   if (Math.abs(diff) < 5) {                 // parfait !
-    nx = top.x; nw = top.w; combo++; score += 2; flash = 1; setHudAv('happy');
-    if (combo >= 3) nw = Math.min(nw + 5, START_W);
+    nx = top.x; nw = top.w; combo++; perfects++; score += 2; flash = 1; setHudAv('happy');
+    if (combo >= 3) nw = Math.min(nw + 5, blocks[0].w);
     comboEl.textContent = combo > 1 ? 'PARFAIT x' + combo + ' !' : 'PARFAIT !';
     beep(520 + combo * 60, 0.12, 'triangle');
   } else {
@@ -315,7 +379,9 @@ function drop() {
       floatText(nx + nw / 2, yy - 14, '+1', '#ffffff');
     }
   }
-  hud.textContent = score;
+  const placed = blocks.length - 1;
+  hud.textContent = mode === 'level' ? placed + '/' + lvlTarget(curLevel) : score;
+  if (mode === 'level' && placed >= lvlTarget(curLevel)) { moving = null; return levelComplete(); }
   dir = -dir; spawn();
 }
 
@@ -325,11 +391,12 @@ function gameOver() {
   if (musicOn) gameOverJingle();
   setHudAv('sad');
   $('overAv').innerHTML = avatarSVG(playerAvatar, 70, 'sad');
-  if (score > best) { best = score; saveBest(); }
+  if (mode === 'endless' && score > best) { best = score; saveBest(); }
   refreshBest();
-  $('finalScore').textContent = score;
+  $('finalScore').textContent = mode === 'level' ? (blocks.length - 1) + '/' + lvlTarget(curLevel) : score;
   $('btnRevive').classList.toggle('hidden', revived || score < 3);
-  setTimeout(() => { elOver.classList.remove('hidden'); submitScore(score); }, 450);
+  if (mode === 'endless') submitScore(score);
+  setTimeout(() => elOver.classList.remove('hidden'), 450);
 }
 
 /* ================= PUBS (point d'intégration Google) ================= */
@@ -453,7 +520,8 @@ function startRound() {
   newGame();
 }
 
-$('btnPlay').onclick = () => { startMusic(); beep(440, 0.1); startRound(); };
+$('btnPlay').onclick = () => { startMusic(); beep(440, 0.1); showMap(); };
+$('btnEndless').onclick = () => { mode = 'endless'; startMusic(); beep(440, 0.1); startRound(); };
 
 $('btnReplay').onclick = () => {
   elOver.classList.add('hidden');
@@ -796,7 +864,7 @@ $('btnLbBack').onclick = () => {
 
 /* ================= PARTAGE ================= */
 $('btnShare').onclick = async () => {
-  const txt = "J'ai fait " + score + " sur Stack Rush ! Tu peux faire mieux ?";
+  const txt = mode === 'level' ? "Je suis au niveau " + Math.min(LEVELS, lvlDone + 1) + " sur Stack Rush ! Tu peux me battre ?" : "J'ai fait " + score + " sur Stack Rush ! Tu peux faire mieux ?";
   const b = $('btnShare');
   try {
     if (navigator.share) { await navigator.share({ text: txt, url: location.href }); return; }
@@ -805,6 +873,96 @@ $('btnShare').onclick = async () => {
     setTimeout(() => b.textContent = 'Partager mon score', 1500);
   } catch (e) {}
 };
+
+/* ================= NIVEAUX : VICTOIRE ET CARTE ================= */
+function winJingle() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const t = actx.currentTime + 0.05;
+    [[60, 0], [64, 0.12], [67, 0.24], [72, 0.38]].forEach(([m, d], i) => note(mtof(m), t + d, i === 3 ? 0.6 : 0.14, 'triangle', 0.12));
+  } catch (e) {}
+}
+function levelComplete() {
+  state = 'won';
+  const stars = perfects >= 6 ? 3 : perfects >= 3 ? 2 : 1;
+  const firstTime = curLevel > lvlDone;
+  const worldCleared = firstTime && curLevel % PER_WORLD === 0 && curLevel < LEVELS;
+  if (firstTime) lvlDone = curLevel;
+  lvlStars[curLevel] = Math.max(lvlStars[curLevel] || 0, stars);
+  saveLevels();
+  if (musicOn) winJingle();
+  for (let k = 0; k < 6; k++) burst(Math.random() * W, 140 + Math.random() * 260, 'hsl(' + Math.floor(Math.random() * 360) + ' 90% 65%)', 14, 220);
+  vib(60); setHudAv('happy');
+  track('niveau-reussi-' + curLevel, 'Niveau réussi');
+  $('winTitle').textContent = worldCleared ? '🌍 Nouveau monde !' : (curLevel >= LEVELS ? '🏆 Jeu terminé !' : 'Niveau réussi !');
+  $('winStars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+  $('winAv').innerHTML = avatarSVG(playerAvatar, 70);
+  $('winInfo').textContent = worldCleared
+    ? 'Tu as débloqué le monde ' + WORLDS[worldOf(curLevel + 1)].n + ' !'
+    : (curLevel >= LEVELS ? 'Bravo, tu as réussi les ' + LEVELS + ' niveaux !' : perfects + ' placement(s) parfait(s) · 3 étoiles = 6 parfaits');
+  $('btnNext').classList.toggle('hidden', curLevel >= LEVELS);
+  setTimeout(() => $('win').classList.remove('hidden'), 700);
+}
+function showMap() {
+  state = 'ready';
+  elStart.classList.add('hidden'); elOver.classList.add('hidden'); $('win').classList.add('hidden'); $('map').classList.remove('hidden');
+  $('mapInfo').textContent = lvlDone + '/' + LEVELS + ' niveaux réussis · étoiles : plus de placements parfaits';
+  const list = $('mapList'); list.textContent = '';
+  WORLDS.forEach((w, wi) => {
+    const first = wi * PER_WORLD + 1, open = first <= lvlDone + 1;
+    const box = document.createElement('div'); box.className = 'world';
+    const nm = document.createElement('div'); nm.className = 'wn';
+    nm.textContent = (open ? '🌍 ' : '🔒 ') + 'Monde ' + (wi + 1) + ' · ' + w.n + (open ? '' : ' (réussis les 5 niveaux d’avant)');
+    const row = document.createElement('div'); row.className = 'lvls';
+    for (let k = 0; k < PER_WORLD; k++) {
+      const n = first + k, ok = n <= lvlDone + 1, done = n <= lvlDone;
+      const b = document.createElement('button');
+      b.className = 'lv' + (ok ? '' : ' locked') + (done ? ' done' : '');
+      b.innerHTML = ok ? n + '<small>' + '★'.repeat(lvlStars[n] || 0) + '</small>' : '🔒';
+      if (ok) b.onclick = () => { mode = 'level'; curLevel = n; $('map').classList.add('hidden'); startRound(); };
+      row.appendChild(b);
+    }
+    box.appendChild(nm); box.appendChild(row); list.appendChild(box);
+  });
+}
+$('btnMapBack').onclick = () => { $('map').classList.add('hidden'); elStart.classList.remove('hidden'); };
+$('btnMapOver').onclick = showMap;
+$('btnWinMap').onclick = showMap;
+$('btnNext').onclick = () => {
+  $('win').classList.add('hidden');
+  curLevel = Math.min(LEVELS, curLevel + 1);
+  if (++adCount % 3 === 0) showInterstitial(startRound); else startRound();
+};
+
+/* ================= INSTALLER / TÉLÉCHARGER LE JEU ================= */
+let deferredPrompt = null;
+const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; });
+addEventListener('appinstalled', () => { deferredPrompt = null; $('btnInstall').classList.add('hidden'); });
+if (isStandalone()) $('btnInstall').classList.add('hidden');
+async function downloadHtml() {              // copie du jeu à garder sur l'appareil (jouable hors ligne)
+  try {
+    const r = await fetch(location.href.split('#')[0].split('?')[0]);
+    const t = await r.text();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([t], { type: 'text/html' }));
+    a.download = 'stack-rush.html';
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) { alert('Téléchargement impossible depuis cette page.'); }
+}
+$('btnInstall').onclick = async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    try { await deferredPrompt.userChoice; } catch (e) {}
+    deferredPrompt = null; return;
+  }
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+    alert("Sur iPhone : touche le bouton Partager (le carré avec une flèche), puis « Sur l'écran d'accueil ».");
+    return;
+  }
+  if (confirm("Pour installer le jeu : ouvre le menu de ton navigateur (⋮ ou ⋯), puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».\n\nTu préfères télécharger le fichier du jeu pour y jouer hors ligne ?")) downloadHtml();
+};
+if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 requestAnimationFrame(loop);
 </script>
