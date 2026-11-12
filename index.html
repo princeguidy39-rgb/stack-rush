@@ -25,6 +25,9 @@
 </script>
 -->
 
+<!-- Statistiques de visites (GoatCounter : gratuit, sans cookies) -->
+<script data-goatcounter="https://stac-krush.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
   html,body{margin:0;height:100%;background:#0f1226;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#fff}
@@ -150,6 +153,15 @@ const W = 360, H = 640, BH = 26;          // taille logique du jeu
 const START_W = 170;                      // largeur du bloc de départ
 const INTERSTITIAL_EVERY = 3;             // pub plein écran toutes les N parties
 
+/* Compte un événement dans GoatCounter (ex : une partie jouée) */
+function track(path, title) {
+  try {
+    if (window.goatcounter && window.goatcounter.count) {
+      window.goatcounter.count({ path: path, title: title, event: true });
+    }
+  } catch (e) {}
+}
+
 /* ================= ÉLÉMENTS ================= */
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
@@ -222,6 +234,7 @@ function newGame() {
   pieces = []; score = 0; combo = 0; cam = 0; dir = 1; revived = false;
   spawn();
   hud.textContent = '0'; comboEl.textContent = ''; setHudAv('');
+  track('partie-jouee', 'Partie jouée');
   state = 'play';
 }
 
