@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Stack Rush</title>
+
+<!--
+  ===== MONÉTISATION (à activer à la publication) =====
+  1. Obtenir un compte AdSense / accès à l'API Ad Placement (jeux H5), puis
+     remplacer ca-pub-XXXXXXXXXXXXXXXX par ton identifiant éditeur.
+  2. Décommenter le bloc ci-dessous (vérifie le snippet exact dans la doc Google).
+  3. Retirer data-adbreak-test="on" une fois en production.
+
+<script async data-adbreak-test="on"
+  src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+  crossorigin="anonymous"></script>
+<script>
+  window.adsbygoogle = window.adsbygoogle || [];
+  window.adBreak = window.adConfig = function (o) { adsbygoogle.push(o); };
+  adConfig({ preloadAds: true, sound: 'on' });
+</script>
+-->
+
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+  html,body{margin:0;height:100%;background:#0f1226;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#fff}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #stage{position:relative}
+  canvas{display:block;border-radius:12px;background:linear-gradient(#1b2150,#0f1226)}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;background:rgba(10,12,30,.72);border-radius:12px;padding:20px}
+  .hidden{display:none!important}
+  h1{margin:0;font-size:40px;letter-spacing:1px}
+  h2{margin:0;font-size:30px}
+  p{margin:0;opacity:.85}
+  .big{font-size:56px;font-weight:800}
+  button{border:0;border-radius:14px;padding:14px 26px;font-size:18px;font-weight:700;cursor:pointer;color:#fff;background:linear-gradient(135deg,#ff5f6d,#ffc371);min-width:220px}
+  button.alt{background:linear-gradient(135deg,#36d1dc,#5b86e5)}
+  button.ghost{background:transparent;border:2px solid rgba(255,255,255,.35)}
+  #hud{position:absolute;top:14px;left:0;right:0;text-align:center;font-size:44px;font-weight:800;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,.4)}
+  #combo{position:absolute;top:70px;left:0;right:0;text-align:center;font-size:18px;font-weight:700;color:#ffd86b;pointer-events:none}
+  #ad{background:#000}
+  #ad .box{border:2px dashed #888;border-radius:12px;padding:30px 20px;width:80%}
+  #btnMusic{position:absolute;top:10px;right:10px;z-index:5;min-width:0;width:40px;height:40px;padding:0;font-size:20px;background:rgba(255,255,255,.15)}
+  #themes{display:flex;gap:12px;justify-content:center}
+  .sw{min-width:0;width:36px;height:36px;padding:0;border-radius:50%;border:3px solid transparent}
+  .sw.on{border-color:#fff}
+  button.small{min-width:180px;padding:10px 20px;font-size:15px}
+  #lbList{list-style:none;margin:0;padding:0;width:80%;text-align:left;font-size:18px;line-height:1.9}
+  #lbList li{border-bottom:1px solid rgba(255,255,255,.12)}
+  #musList{display:flex;flex-direction:column;gap:10px;align-items:center}
+  button.sel{outline:3px solid #fff}
+  #nameInput{width:80%;padding:14px;font-size:22px;text-align:center;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);color:#fff;outline:none}
+  #nameInput:focus{border-color:#ffc371}
+  /* avatars animés */
+  .av{display:inline-block;animation:avBob 1.6s ease-in-out infinite}
+  .av .eye{transform-box:fill-box;transform-origin:center;animation:avBlink 4s infinite}
+  .av.still,.av.still .eye{animation:none}
+  .av .m-sad{display:none}
+  .av.sad .m-sad{display:block}
+  .av.sad .m-happy{display:none}
+  .av.happy{animation:avJump .5s}
+  .av.sad{animation:avSad 1.2s ease-in-out infinite}
+  @keyframes avBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  @keyframes avBlink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+  @keyframes avJump{0%{transform:translateY(0) scale(1)}40%{transform:translateY(-16px) scale(1.15) rotate(-8deg)}100%{transform:translateY(0) scale(1)}}
+  @keyframes avSad{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg) translateY(3px)}}
+  #hudAv{position:absolute;top:8px;left:10px;pointer-events:none}
+  #avPick{display:grid;grid-template-columns:repeat(3,64px);gap:10px;justify-content:center}
+  .sw2{min-width:0;width:64px;height:64px;padding:4px;border-radius:14px;background:rgba(255,255,255,.1);border:3px solid transparent}
+  .sw2.on{border-color:#fff;background:rgba(255,255,255,.22)}
+  #lbList .av{vertical-align:middle}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="hud">0</div>
+    <div id="combo"></div>
+    <div id="hudAv"></div>
+    <button id="btnMusic" title="Musique">🔊</button>
+
+    <div id="start" class="overlay">
+      <h1>STACK RUSH</h1>
+      <p>Tape au bon moment pour empiler les blocs.<br>Plus c'est précis, plus ta tour grandit !</p>
+      <p id="pseudoShow" style="font-weight:700;font-size:20px"></p>
+      <p id="bestStart"></p>
+      <button id="btnPlay">JOUER</button>
+      <button id="btnLbStart" class="ghost small">🏆 Classement</button>
+      <button id="btnMusStart" class="ghost small">🎵 Choisir la musique</button>
+      <button id="btnChangeName" class="ghost small">✏️ Pseudo & avatar</button>
+      <p style="font-size:13px;margin-top:6px">Thème</p>
+      <div id="themes"></div>
+    </div>
+
+    <div id="over" class="overlay hidden">
+      <h2>Perdu !</h2>
+      <div id="overAv"></div>
+      <div class="big" id="finalScore">0</div>
+      <p id="bestOver"></p>
+      <button id="btnRevive" class="alt">▶ Revivre (voir une pub)</button>
+      <button id="btnReplay">REJOUER</button>
+      <button id="btnShare" class="ghost small">Partager mon score</button>
+      <button id="btnLbOver" class="ghost small">🏆 Classement</button>
+      <button id="btnMusOver" class="ghost small">🎵 Choisir la musique</button>
+    </div>
+
+    <div id="lb" class="overlay hidden">
+      <h2>🏆 Classement</h2>
+      <ul id="lbList"></ul>
+      <button id="btnLbBack">RETOUR</button>
+    </div>
+
+    <div id="name" class="overlay hidden">
+      <h2>Ton pseudo & avatar</h2>
+      <p style="font-size:14px">Il apparaîtra dans le classement.<br>1re lettre en minuscule, le reste en MAJUSCULES<br>(ex : prince → pRINCE)</p>
+      <div id="avPick"></div>
+      <input id="nameInput" maxlength="12" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ton pseudo">
+      <p id="namePrev" style="font-size:24px;font-weight:800;min-height:32px"></p>
+      <p id="nameErr" style="color:#ff8a8a;font-size:13px;min-height:16px"></p>
+      <button id="btnNameOk">VALIDER</button>
+    </div>
+
+    <div id="mus" class="overlay hidden">
+      <h2>🎵 Musique</h2>
+      <div id="musList"></div>
+      <button id="btnMusFile" class="alt small">📁 Ma propre musique</button>
+      <input type="file" id="musFile" accept="audio/*" hidden>
+      <p style="font-size:12px">Ta musique reste sur ton appareil (rien n'est envoyé).</p>
+      <button id="btnMusBack">RETOUR</button>
+    </div>
+
+    <div id="ad" class="overlay hidden">
+      <div class="box">
+        <p>PUB DE TEST</p>
+        <p id="adTimer" style="font-size:40px;font-weight:800;margin-top:10px">3</p>
+        <p style="font-size:13px;margin-top:10px">Ici s'affichera la vraie pub Google une fois l'API activée.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const W = 360, H = 640, BH = 26;          // taille logique du jeu
+const START_W = 170;                      // largeur du bloc de départ
+const INTERSTITIAL_EVERY = 3;             // pub plein écran toutes les N parties
+
+/* ================= ÉLÉMENTS ================= */
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+const hud = $('hud'), comboEl = $('combo');
+const elStart = $('start'), elOver = $('over'), elAd = $('ad');
+
+cv.width = W * 2; cv.height = H * 2; ctx.scale(2, 2);
+function resize() {
+  const s = Math.min(innerWidth / W, innerHeight / H);
+  cv.style.width = W * s + 'px'; cv.style.height = H * s + 'px';
+  const st = $('stage'); st.style.width = W * s + 'px'; st.style.height = H * s + 'px';
+  st.style.fontSize = (s) + 'px';
+}
+addEventListener('resize', resize); resize();
+
+/* ================= SCORE / STOCKAGE ================= */
+let best = 0;
+try { best = parseInt(localStorage.getItem('stackrush_best') || '0', 10) || 0; } catch (e) {}
+function saveBest() { try { localStorage.setItem('stackrush_best', String(best)); } catch (e) {} }
+function refreshBest() {
+  $('bestStart').textContent = best ? 'Meilleur score : ' + best : '';
+  $('bestOver').textContent = 'Meilleur score : ' + best;
+}
+refreshBest();
+
+/* ================= SON ================= */
+let actx = null;
+function beep(freq, dur = 0.08, type = 'sine', vol = 0.08) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g); g.connect(actx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+    o.stop(actx.currentTime + dur);
+  } catch (e) {}
+}
+
+/* ================= ÉTAT DU JEU ================= */
+let state = 'ready';     // ready | play | over | ad
+let blocks, moving, pieces = [], score = 0, combo = 0, cam = 0, dir = 1, revived = false, gamesPlayed = 0, flash = 0;
+
+/* ---- Thèmes de couleurs ---- */
+const THEMES = [
+  { n: 'Néon',   h0: 200, span: 160, bg: ['#1b2150', '#0f1226'] },
+  { n: 'Sunset', h0: 0,   span: 50,  bg: ['#4a1942', '#1a0b2e'] },
+  { n: 'Forêt',  h0: 90,  span: 70,  bg: ['#12372a', '#0a1f18'] },
+  { n: 'Bonbon', h0: 290, span: 70,  bg: ['#4b2a63', '#241134'] }
+];
+let themeIdx = 0;
+try { themeIdx = (parseInt(localStorage.getItem('stackrush_theme') || '0', 10) || 0) % THEMES.length; } catch (e) {}
+const hue = i => { const t = THEMES[themeIdx]; return t.h0 + t.span * (0.5 + 0.5 * Math.sin(i * 0.3)); };
+function applyTheme() {
+  const t = THEMES[themeIdx];
+  cv.style.background = `linear-gradient(${t.bg[0]},${t.bg[1]})`;
+  document.querySelectorAll('.sw').forEach((b, k) => b.classList.toggle('on', k === themeIdx));
+}
+THEMES.forEach((t, k) => {
+  const b = document.createElement('button');
+  b.className = 'sw'; b.title = t.n;
+  b.style.background = `hsl(${t.h0 + t.span / 2} 70% 58%)`;
+  b.onclick = () => { themeIdx = k; try { localStorage.setItem('stackrush_theme', String(k)); } catch (e) {} applyTheme(); };
+  $('themes').appendChild(b);
+});
+applyTheme();
+const yOf = i => H - 150 - (i - cam) * BH;
+
+function newGame() {
+  blocks = [{ x: (W - START_W) / 2, w: START_W, i: 0 }];
+  pieces = []; score = 0; combo = 0; cam = 0; dir = 1; revived = false;
+  spawn();
+  hud.textContent = '0'; comboEl.textContent = ''; setHudAv('');
+  state = 'play';
+}
+
+function spawn() {
+  const top = blocks[blocks.length - 1];
+  moving = { x: dir > 0 ? 0 : W - top.w, w: top.w, i: blocks.length, dir: dir };
+}
+
+function speed() { return 150 + Math.min(score * 5, 280); }   // px / seconde
+
+function drop() {
+  if (state !== 'play' || !moving) return;
+  const top = blocks[blocks.length - 1];
+  const diff = moving.x - top.x;
+  const overlap = moving.w - Math.abs(diff);
+
+  if (overlap <= 0) {                       // raté
+    pieces.push({ x: moving.x, w: moving.w, i: moving.i, vy: 0, vx: diff > 0 ? 40 : -40 });
+    moving = null; beep(130, 0.3, 'sawtooth', 0.1);
+    return gameOver();
+  }
+
+  let nx, nw;
+  if (Math.abs(diff) < 5) {                 // parfait !
+    nx = top.x; nw = top.w; combo++; score += 2; flash = 1; setHudAv('happy');
+    if (combo >= 3) nw = Math.min(nw + 5, START_W);
+    comboEl.textContent = combo > 1 ? 'PARFAIT x' + combo + ' !' : 'PARFAIT !';
+    beep(520 + combo * 60, 0.12, 'triangle');
+  } else {
+    combo = 0; score += 1; comboEl.textContent = '';
+    if (diff > 0) { nx = moving.x; nw = overlap;
+      pieces.push({ x: top.x + top.w, w: Math.abs(diff), i: moving.i, vy: 0, vx: 30 });
+    } else { nx = top.x; nw = overlap;
+      pieces.push({ x: moving.x, w: Math.abs(diff), i: moving.i, vy: 0, vx: -30 });
+    }
+    beep(300 + score * 8, 0.07, 'square', 0.05);
+  }
+  blocks.push({ x: nx, w: nw, i: moving.i });
+  hud.textContent = score;
+  dir = -dir; spawn();
+}
+
+function gameOver() {
+  state = 'over';
+  gamesPlayed++;
+  if (musicOn) gameOverJingle();
+  setHudAv('sad');
+  $('overAv').innerHTML = avatarSVG(playerAvatar, 70, 'sad');
+  if (score > best) { best = score; saveBest(); }
+  refreshBest();
+  $('finalScore').textContent = score;
+  $('btnRevive').classList.toggle('hidden', revived || score < 3);
+  setTimeout(() => { elOver.classList.remove('hidden'); submitScore(score); }, 450);
+}
+
+/* ================= PUBS (point d'intégration Google) ================= */
+/* Mode test : fausse pub de 3 secondes.
+   En production, ces deux fonctions appellent l'API Ad Placement (adBreak). */
+function fakeAd(done) {
+  state = 'ad'; elAd.classList.remove('hidden');
+  let t = 3; $('adTimer').textContent = t;
+  const iv = setInterval(() => {
+    t--; $('adTimer').textContent = t;
+    if (t <= 0) { clearInterval(iv); elAd.classList.add('hidden'); done(); }
+  }, 1000);
+}
+
+function showInterstitial(done) {            // pub plein écran entre deux parties
+  if (typeof window.adBreak === 'function') {
+    adBreak({ type: 'next', name: 'entre-parties', adBreakDone: () => done() });
+  } else { fakeAd(done); }
+}
+
+function showRewarded(onReward, onFail) {    // pub récompensée : revivre
+  if (typeof window.adBreak === 'function') {
+    let rewarded = false;
+    adBreak({
+      type: 'reward', name: 'revivre',
+      beforeReward: showAd => showAd(),
+      adViewed: () => { rewarded = true; },
+      adDismissed: () => {},
+      adBreakDone: () => rewarded ? onReward() : onFail()
+    });
+  } else { fakeAd(onReward); }
+}
+
+/* ================= BOUCLE ================= */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+
+function update(dt) {
+  if (state === 'play' && moving) {
+    moving.x += moving.dir * speed() * dt;
+    if (moving.x <= 0) { moving.x = 0; moving.dir = 1; }
+    if (moving.x + moving.w >= W) { moving.x = W - moving.w; moving.dir = -1; }
+  }
+  // caméra
+  const target = Math.max(0, blocks ? blocks.length - 6 : 0);
+  cam += (target - cam) * Math.min(1, dt * 6);
+  // morceaux qui tombent
+  for (const p of pieces) { p.vy += 1400 * dt; p.y = (p.y || 0) + p.vy * dt; p.x += p.vx * dt; }
+  pieces = pieces.filter(p => p.y < H);
+  flash = Math.max(0, flash - dt * 3);
+}
+
+function drawBlock(x, w, i, alpha = 1, yOff = 0) {
+  const y = yOf(i) + yOff;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = `hsl(${hue(i)} 70% 58%)`;
+  ctx.fillRect(x, y, w, BH - 2);
+  ctx.fillStyle = `hsl(${hue(i)} 70% 72%)`;
+  ctx.fillRect(x, y, w, 5);
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (!blocks) { // décor de l'écran d'accueil
+    for (let k = 0; k < 6; k++) drawBlock(60 + k * 8, 180 - k * 12, k - 0);
+    return;
+  }
+  for (const b of blocks) { if (yOf(b.i) < H + BH) drawBlock(b.x, b.w, b.i); }
+  if (moving) drawBlock(moving.x, moving.w, moving.i);
+  for (const p of pieces) drawBlock(p.x, p.w, p.i, 0.9, p.y || 0);
+  if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.25})`; ctx.fillRect(0, 0, W, H); }
+}
+
+/* ================= ENTRÉES ================= */
+function tap(e) {
+  if (e) e.preventDefault();
+  if (state === 'play') drop();
+}
+cv.addEventListener('pointerdown', tap);
+addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); tap(); } });
+
+function startRound() {
+  elStart.classList.add('hidden'); elOver.classList.add('hidden');
+  newGame();
+}
+
+$('btnPlay').onclick = () => { startMusic(); beep(440, 0.1); startRound(); };
+
+$('btnReplay').onclick = () => {
+  elOver.classList.add('hidden');
+  if (gamesPlayed % INTERSTITIAL_EVERY === 0) showInterstitial(startRound);
+  else startRound();
+};
+
+$('btnRevive').onclick = () => {
+  elOver.classList.add('hidden');
+  showRewarded(
+    () => { revived = true; combo = 0; spawn(); state = 'play'; },   // récompense : on continue
+    () => elOver.classList.remove('hidden')                            // pub non vue : retour
+  );
+};
+
+/* ================= MUSIQUE (générée dans le code, aucun fichier, aucun droit d'auteur) ================= */
+let musicOn = true;
+try { musicOn = localStorage.getItem('stackrush_music') !== '0'; } catch (e) {}
+const TRACKS = [
+  { n: 'Arcade',  chords: [[57,60,64],[53,57,60],[48,52,55],[55,59,62]],           arp: [0,1,2,1,0,1,2,1], bpm: 100, wave: 'triangle', vol: 0.045, mel: true },
+  { n: 'Chill',   chords: [[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,65]], arp: [0,1,2,3,2,1,2,1], bpm: 78,  wave: 'sine',     vol: 0.06,  mel: false },
+  { n: 'Énergie', chords: [[57,60,64],[55,59,62],[53,57,60],[52,56,59]],           arp: [0,2,1,2,0,2,1,2], bpm: 128, wave: 'sawtooth', vol: 0.025, mel: true }
+];
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+let musicTimer = null, nextT = 0, mStep = 0, musOpen = false;
+let trackIdx = 0;                       // 0..N = musique intégrée, -1 = fichier du joueur
+let customAudio = null, customUrl = null, customName = '';
+try { const k = parseInt(localStorage.getItem('stackrush_track') || '0', 10); if (k >= 0 && k < TRACKS.length) trackIdx = k; } catch (e) {}
+
+function note(freq, t, dur, type, vol) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t); o.stop(t + dur);
+}
+function scheduler() {
+  // la musique se tait pendant les pubs, onglet caché, et après un game over (sauf dans le menu musique)
+  const want = musicOn && state !== 'ad' && !document.hidden && (state !== 'over' || musOpen);
+  if (customAudio) {
+    if (want && trackIdx === -1) { if (customAudio.paused) customAudio.play().catch(() => {}); }
+    else if (!customAudio.paused) customAudio.pause();
+  }
+  if (!want || trackIdx === -1) { nextT = Math.max(nextT, actx.currentTime + 0.05); return; }
+  const T = TRACKS[trackIdx];
+  const bpm = T.bpm + Math.min(score * 1.5, 30);        // le rythme accélère avec le score
+  const eighth = 60 / bpm / 2;
+  while (nextT < actx.currentTime + 0.25) {
+    const chord = T.chords[Math.floor(mStep / 8) % 4], s = mStep % 8;
+    note(mtof(chord[T.arp[s]] + 12), nextT, eighth * 0.9, T.wave, T.vol);                    // arpège
+    if (s % 2 === 0) note(mtof(chord[0] - 12), nextT, eighth * 1.8, 'sine', 0.09);           // basse
+    if (T.mel && (s === 3 || s === 7)) note(mtof(chord[2] + 24), nextT, eighth * 0.6, 'square', 0.02); // mélodie
+    nextT += eighth; mStep++;
+  }
+}
+function startMusic() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    if (!musicTimer) { nextT = actx.currentTime + 0.1; mStep = 0; musicTimer = setInterval(scheduler, 100); }
+  } catch (e) {}
+}
+function refreshMusicBtn() { $('btnMusic').textContent = musicOn ? '🔊' : '🔇'; }
+$('btnMusic').onclick = () => {
+  musicOn = !musicOn;
+  try { localStorage.setItem('stackrush_music', musicOn ? '1' : '0'); } catch (e) {}
+  refreshMusicBtn();
+  if (musicOn) startMusic();
+};
+refreshMusicBtn();
+
+/* ---- Musique de GAME OVER ---- */
+function gameOverJingle() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const t = actx.currentTime + 0.05;
+    [[64, 0], [62, 0.2], [60, 0.4], [57, 0.65]].forEach(([m, d], i) =>
+      note(mtof(m), t + d, i === 3 ? 0.8 : 0.24, 'triangle', 0.13));
+    note(mtof(45), t + 0.65, 1.0, 'sine', 0.15);
+  } catch (e) {}
+}
+
+/* ---- Choix de la musique par le joueur ---- */
+let musFrom = 'start';
+function buildMusList() {
+  const box = $('musList'); box.textContent = '';
+  const add = (label, selected, fn) => {
+    const b = document.createElement('button');
+    b.className = 'ghost small' + (selected ? ' sel' : '');
+    b.textContent = (selected ? '✓ ' : '') + label;
+    b.onclick = fn; box.appendChild(b);
+  };
+  TRACKS.forEach((t, k) => add(t.n, trackIdx === k, () => {
+    trackIdx = k; mStep = 0;
+    try { localStorage.setItem('stackrush_track', String(k)); } catch (e) {}
+    if (!musicOn) { musicOn = true; refreshMusicBtn(); }
+    startMusic(); buildMusList();
+  }));
+  if (customAudio) add('Ma musique : ' + customName, trackIdx === -1, () => {
+    trackIdx = -1; if (!musicOn) { musicOn = true; refreshMusicBtn(); }
+    startMusic(); buildMusList();
+  });
+}
+function showMus(from) {
+  musFrom = from; musOpen = true;
+  elStart.classList.add('hidden'); elOver.classList.add('hidden'); $('mus').classList.remove('hidden');
+  buildMusList();
+}
+$('btnMusStart').onclick = () => showMus('start');
+$('btnMusOver').onclick = () => showMus('over');
+$('btnMusBack').onclick = () => {
+  musOpen = false; $('mus').classList.add('hidden');
+  (musFrom === 'over' ? elOver : elStart).classList.remove('hidden');
+};
+$('btnMusFile').onclick = () => $('musFile').click();
+$('musFile').onchange = e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  if (customAudio) { customAudio.pause(); if (customUrl) URL.revokeObjectURL(customUrl); }
+  customUrl = URL.createObjectURL(f);
+  customAudio = new Audio(customUrl); customAudio.loop = true; customAudio.volume = 0.6;
+  customName = f.name.slice(0, 24);
+  trackIdx = -1;
+  if (!musicOn) { musicOn = true; refreshMusicBtn(); }
+  startMusic(); buildMusList();
+};
+
+/* ================= CLASSEMENT ================= */
+/* Local par défaut. Pour un classement EN LIGNE mondial : crée une base
+   Firebase Realtime Database (gratuit) et colle son URL ici, ex :
+   'https://mon-projet-default-rtdb.firebaseio.com'
+   Règles Firebase conseillées : lecture publique, écriture limitée à /scores
+   avec validation (name = texte court, score = nombre). */
+const FIREBASE_DB_URL = '';
+
+/* ---- Avatars animés (créatures originales dessinées en code) ---- */
+const AV = [
+  { n: 'Chat',  c: '#ffb86b', extra: '<polygon points="22,40 24,8 46,26" fill="%c"/><polygon points="78,40 76,8 54,26" fill="%c"/>' },
+  { n: 'Ours',  c: '#c98f6b', extra: '<circle cx="24" cy="28" r="12" fill="%c"/><circle cx="76" cy="28" r="12" fill="%c"/>' },
+  { n: 'Lapin', c: '#f4e4f0', extra: '<ellipse cx="36" cy="14" rx="9" ry="20" fill="%c"/><ellipse cx="64" cy="14" rx="9" ry="20" fill="%c"/>' },
+  { n: 'Robot', c: '#8fb4ff', square: true, extra: '<rect x="48" y="2" width="4" height="28" fill="#6b8fd6"/><circle cx="50" cy="5" r="5" fill="#ff5f6d"/>' },
+  { n: 'Alien', c: '#b58bff', extra: '<line x1="36" y1="30" x2="28" y2="9" stroke="%c" stroke-width="4"/><circle cx="28" cy="8" r="6" fill="%c"/><line x1="64" y1="30" x2="72" y2="9" stroke="%c" stroke-width="4"/><circle cx="72" cy="8" r="6" fill="%c"/>' },
+  { n: 'Dino',  c: '#5fd38d', extra: '<polygon points="30,28 37,8 44,26" fill="#ffb347"/><polygon points="44,26 51,5 58,26" fill="#ffb347"/><polygon points="58,26 65,8 72,28" fill="#ffb347"/>' }
+];
+function avatarSVG(k, size, cls) {
+  const a = AV[k | 0] || AV[0];
+  const body = a.square
+    ? `<rect x="14" y="26" width="72" height="66" rx="14" fill="${a.c}"/>`
+    : `<ellipse cx="50" cy="58" rx="38" ry="34" fill="${a.c}"/>`;
+  return `<svg class="av ${cls || ''}" width="${size}" height="${size}" viewBox="0 0 100 100">` +
+    a.extra.replace(/%c/g, a.c) + body +
+    `<ellipse class="eye" cx="37" cy="54" rx="5" ry="7" fill="#222"/><ellipse class="eye" cx="63" cy="54" rx="5" ry="7" fill="#222"/>` +
+    `<circle cx="27" cy="68" r="5" fill="#ff9db0" opacity=".7"/><circle cx="73" cy="68" r="5" fill="#ff9db0" opacity=".7"/>` +
+    `<path class="m-happy" d="M40 70 Q50 80 60 70" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>` +
+    `<path class="m-sad" d="M40 78 Q50 68 60 78" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`;
+}
+let playerAvatar = 0;
+try { const k = parseInt(localStorage.getItem('stackrush_avatar') || '0', 10); if (k >= 0 && k < AV.length) playerAvatar = k; } catch (e) {}
+let pickAv = playerAvatar;
+function setHudAv(cls) {                       // réaction de l'avatar : 'happy' (parfait), 'sad' (perdu), '' (normal)
+  const s = $('hudAv').firstChild; if (!s) return;
+  s.classList.remove('happy', 'sad');
+  if (cls) {
+    s.classList.add(cls);
+    if (cls === 'happy') setTimeout(() => s.classList.remove('happy'), 520);
+  }
+}
+function buildAvPicker() {
+  const box = $('avPick'); box.textContent = '';
+  AV.forEach((a, k) => {
+    const b = document.createElement('button');
+    b.className = 'sw2' + (k === pickAv ? ' on' : ''); b.title = a.n;
+    b.innerHTML = avatarSVG(k, 52, k === pickAv ? '' : 'still');
+    b.onclick = () => { pickAv = k; buildAvPicker(); };
+    box.appendChild(b);
+  });
+}
+
+/* ---- Pseudo : 1re lettre en minuscule, le reste en MAJUSCULES (ex : prince -> pRINCE) ---- */
+function fmtName(s) {
+  s = String(s || '').trim().replace(/[^\p{L}\p{N}_]/gu, '').slice(0, 12);
+  return s ? s.charAt(0).toLowerCase() + s.slice(1).toUpperCase() : '';
+}
+let playerName = '';
+try { playerName = fmtName(localStorage.getItem('stackrush_name')); } catch (e) {}
+if (playerName.length < 3) playerName = '';
+function getName() { return playerName; }
+function refreshPseudo() {
+  const p = $('pseudoShow'); p.textContent = '';
+  if (playerName) {
+    const s = document.createElement('span'); s.innerHTML = avatarSVG(playerAvatar, 64);
+    p.appendChild(s); p.appendChild(document.createElement('br')); p.appendChild(document.createTextNode(playerName));
+  }
+  $('hudAv').innerHTML = playerName ? avatarSVG(playerAvatar, 46) : '';
+}
+function askName() {
+  elStart.classList.add('hidden'); elOver.classList.add('hidden');
+  $('name').classList.remove('hidden');
+  $('nameInput').value = playerName; $('namePrev').textContent = playerName; $('nameErr').textContent = '';
+  pickAv = playerAvatar; buildAvPicker();
+  setTimeout(() => $('nameInput').focus(), 50);
+}
+$('nameInput').oninput = () => {
+  const f = fmtName($('nameInput').value);
+  $('namePrev').textContent = f;
+  $('nameErr').textContent = '';
+};
+$('nameInput').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') $('btnNameOk').click(); };
+$('btnNameOk').onclick = () => {
+  const n = fmtName($('nameInput').value);
+  if (n.length < 3) { $('nameErr').textContent = 'Minimum 3 caractères (lettres, chiffres ou _).'; return; }
+  playerName = n; playerAvatar = pickAv;
+  try { localStorage.setItem('stackrush_avatar', String(pickAv)); } catch (e) {}
+  try { localStorage.setItem('stackrush_name', n); } catch (e) {}
+  refreshPseudo(); refreshBest();
+  $('name').classList.add('hidden'); elStart.classList.remove('hidden');
+};
+$('btnChangeName').onclick = askName;
+refreshPseudo();
+if (!playerName) askName();
+function localScores() {
+  try { return JSON.parse(localStorage.getItem('stackrush_lb') || '[]'); } catch (e) { return []; }
+}
+async function submitScore(s) {
+  if (s < 1) return;
+  const entry = { name: getName(), av: playerAvatar, score: s, t: Date.now() };
+  if (FIREBASE_DB_URL) {
+    try { await fetch(FIREBASE_DB_URL + '/scores.json', { method: 'POST', body: JSON.stringify(entry) }); } catch (e) {}
+  } else {
+    const l = localScores(); l.push(entry); l.sort((a, b) => b.score - a.score);
+    try { localStorage.setItem('stackrush_lb', JSON.stringify(l.slice(0, 10))); } catch (e) {}
+  }
+}
+async function loadScores() {
+  if (FIREBASE_DB_URL) {
+    try {
+      const r = await fetch(FIREBASE_DB_URL + '/scores.json?orderBy="score"&limitToLast=10');
+      const o = await r.json();
+      return Object.values(o || {}).sort((a, b) => b.score - a.score);
+    } catch (e) { return null; }
+  }
+  return localScores();
+}
+let lbFrom = 'start';
+async function showLB(from) {
+  lbFrom = from;
+  elStart.classList.add('hidden'); elOver.classList.add('hidden'); $('lb').classList.remove('hidden');
+  const ul = $('lbList'); ul.textContent = 'Chargement…';
+  const list = await loadScores();
+  ul.textContent = '';
+  if (!list) { ul.textContent = 'Classement indisponible.'; return; }
+  if (!list.length) { ul.textContent = 'Aucun score pour le moment.'; return; }
+  list.forEach((e, i) => {
+    const li = document.createElement('li');
+    li.textContent = ' ' + (i + 1) + '. ' + (fmtName(e.name) || '???') + ' — ' + (Number(e.score) || 0);
+    li.insertAdjacentHTML('afterbegin', avatarSVG(Number(e.av) || 0, 28, 'still'));
+    ul.appendChild(li);
+  });
+}
+$('btnLbStart').onclick = () => showLB('start');
+$('btnLbOver').onclick = () => showLB('over');
+$('btnLbBack').onclick = () => {
+  $('lb').classList.add('hidden');
+  (lbFrom === 'over' ? elOver : elStart).classList.remove('hidden');
+};
+
+/* ================= PARTAGE ================= */
+$('btnShare').onclick = async () => {
+  const txt = "J'ai fait " + score + " sur Stack Rush ! Tu peux faire mieux ?";
+  const b = $('btnShare');
+  try {
+    if (navigator.share) { await navigator.share({ text: txt, url: location.href }); return; }
+    await navigator.clipboard.writeText(txt + ' ' + location.href);
+    b.textContent = 'Copié !';
+    setTimeout(() => b.textContent = 'Partager mon score', 1500);
+  } catch (e) {}
+};
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
