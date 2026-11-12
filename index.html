@@ -54,7 +54,7 @@
   button.small{min-width:180px;padding:10px 20px;font-size:15px}
   #lbList{list-style:none;margin:0;padding:0;width:80%;text-align:left;font-size:18px;line-height:1.9}
   #lbList li{border-bottom:1px solid rgba(255,255,255,.12)}
-  #musList{display:flex;flex-direction:column;gap:10px;align-items:center}
+  #musList{display:flex;flex-direction:column;gap:10px;align-items:center;max-height:240px;overflow-y:auto;padding:2px 6px}
   button.sel{outline:3px solid #fff}
   #nameInput{width:80%;padding:14px;font-size:22px;text-align:center;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);color:#fff;outline:none}
   #nameInput:focus{border-color:#ffc371}
@@ -72,10 +72,12 @@
   @keyframes avJump{0%{transform:translateY(0) scale(1)}40%{transform:translateY(-16px) scale(1.15) rotate(-8deg)}100%{transform:translateY(0) scale(1)}}
   @keyframes avSad{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg) translateY(3px)}}
   #hudAv{position:absolute;top:8px;left:10px;pointer-events:none}
-  #avPick{display:grid;grid-template-columns:repeat(3,64px);gap:10px;justify-content:center}
-  .sw2{min-width:0;width:64px;height:64px;padding:4px;border-radius:14px;background:rgba(255,255,255,.1);border:3px solid transparent}
+  #avPick{display:grid;grid-template-columns:repeat(4,60px);gap:8px;justify-content:center;max-height:170px;overflow-y:auto;padding:2px}
+  .sw2{min-width:0;width:60px;height:60px;padding:3px;border-radius:14px;background:rgba(255,255,255,.1);border:3px solid transparent}
   .sw2.on{border-color:#fff;background:rgba(255,255,255,.22)}
   #lbList .av{vertical-align:middle}
+  img.av{border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.8);background:#222}
+  img.av.sad{filter:grayscale(.7) brightness(.8)}
 </style>
 </head>
 <body>
@@ -121,8 +123,10 @@
 
     <div id="name" class="overlay hidden">
       <h2>Ton pseudo & avatar</h2>
-      <p style="font-size:14px">Il apparaîtra dans le classement.<br>1re lettre en minuscule, le reste en MAJUSCULES<br>(ex : prince → pRINCE)</p>
+      <p style="font-size:14px">Format : 1re lettre minuscule, reste en MAJUSCULES<br>(ex : prince → pRINCE)</p>
       <div id="avPick"></div>
+      <button id="btnPhoto" class="alt small">📷 Ma propre photo</button>
+      <input type="file" id="photoFile" accept="image/*" hidden>
       <input id="nameInput" maxlength="12" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ton pseudo">
       <p id="namePrev" style="font-size:24px;font-weight:800;min-height:32px"></p>
       <p id="nameErr" style="color:#ff8a8a;font-size:13px;min-height:16px"></p>
@@ -246,6 +250,29 @@ function spawn() {
 
 function speed() { return 150 + Math.min(score * 5, 280); }   // px / seconde
 
+/* ================= EFFETS VISUELS ================= */
+let particles = [], floats = [], rings = [], shake = 0;
+const stars = Array.from({ length: 45 }, () => ({
+  x: Math.random() * W, y: Math.random() * H,
+  r: Math.random() * 1.6 + 0.6, s: Math.random() * 0.6 + 0.3, t: Math.random() * 6
+}));
+function burst(x, y, color, n, power) {              // explosion de particules
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * Math.PI * 2, v = (Math.random() * 0.6 + 0.4) * power, life = 0.5 + Math.random() * 0.5;
+    particles.push({ x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: life, max: life, c: color, r: Math.random() * 2.5 + 1.5 });
+  }
+}
+function floatText(x, y, text, color) { floats.push({ x: x, y: y, text: text, color: color, life: 1 }); }
+function vib(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }   // vibration (Android)
+function drawStars() {
+  for (const s of stars) {
+    const y = (s.y + (cam || 0) * s.r * 6) % H;
+    ctx.globalAlpha = 0.3 + 0.35 * Math.sin(s.t);
+    ctx.fillStyle = '#fff'; ctx.fillRect(s.x, y, s.r, s.r);
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drop() {
   if (state !== 'play' || !moving) return;
   const top = blocks[blocks.length - 1];
@@ -254,6 +281,8 @@ function drop() {
 
   if (overlap <= 0) {                       // raté
     pieces.push({ x: moving.x, w: moving.w, i: moving.i, vy: 0, vx: diff > 0 ? 40 : -40 });
+    burst(moving.x + moving.w / 2, yOf(moving.i) + BH / 2, '#ff6b6b', 32, 230);
+    shake = 1; vib(180);
     moving = null; beep(130, 0.3, 'sawtooth', 0.1);
     return gameOver();
   }
@@ -274,6 +303,18 @@ function drop() {
     beep(300 + score * 8, 0.07, 'square', 0.05);
   }
   blocks.push({ x: nx, w: nw, i: moving.i });
+  {
+    const yy = yOf(moving.i) + BH / 2, col = `hsl(${hue(moving.i)} 85% 65%)`;
+    if (combo > 0) {                                  // placement parfait : gros effet
+      burst(nx + nw / 2, yy, col, 18 + combo * 4, 190);
+      rings.push({ x: nx, w: nw, y: yy, life: 1 });
+      floatText(nx + nw / 2, yy - 14, combo > 1 ? 'PARFAIT x' + combo : 'PARFAIT !', '#ffd86b');
+      vib(25);
+    } else {                                          // placement normal : petit effet
+      burst(nx + nw / 2, yy, col, 6, 80);
+      floatText(nx + nw / 2, yy - 14, '+1', '#ffffff');
+    }
+  }
   hud.textContent = score;
   dir = -dir; spawn();
 }
@@ -343,6 +384,14 @@ function update(dt) {
   for (const p of pieces) { p.vy += 1400 * dt; p.y = (p.y || 0) + p.vy * dt; p.x += p.vx * dt; }
   pieces = pieces.filter(p => p.y < H);
   flash = Math.max(0, flash - dt * 3);
+  for (const p of particles) { p.vy += 500 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+  particles = particles.filter(p => p.life > 0);
+  for (const f of floats) { f.y -= 40 * dt; f.life -= dt * 1.2; }
+  floats = floats.filter(f => f.life > 0);
+  for (const r of rings) { r.life -= dt * 2.2; }
+  rings = rings.filter(r => r.life > 0);
+  shake = Math.max(0, shake - dt * 2.5);
+  for (const s of stars) { s.t += dt * s.s * 3; }
 }
 
 function drawBlock(x, w, i, alpha = 1, yOff = 0) {
@@ -357,14 +406,38 @@ function drawBlock(x, w, i, alpha = 1, yOff = 0) {
 
 function draw() {
   ctx.clearRect(0, 0, W, H);
+  drawStars();
+  ctx.save();
+  if (shake > 0) ctx.translate((Math.random() - 0.5) * 14 * shake, (Math.random() - 0.5) * 14 * shake);
   if (!blocks) { // décor de l'écran d'accueil
     for (let k = 0; k < 6; k++) drawBlock(60 + k * 8, 180 - k * 12, k - 0);
+    ctx.restore();
     return;
   }
   for (const b of blocks) { if (yOf(b.i) < H + BH) drawBlock(b.x, b.w, b.i); }
-  if (moving) drawBlock(moving.x, moving.w, moving.i);
+  if (moving) {                                       // le bloc qui bouge brille
+    ctx.shadowColor = `hsl(${hue(moving.i)} 90% 60%)`; ctx.shadowBlur = 18;
+    drawBlock(moving.x, moving.w, moving.i);
+    ctx.shadowBlur = 0;
+  }
   for (const p of pieces) drawBlock(p.x, p.w, p.i, 0.9, p.y || 0);
   if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.25})`; ctx.fillRect(0, 0, W, H); }
+  for (const r of rings) {                            // onde "parfait"
+    const g = 1 - r.life;
+    ctx.strokeStyle = `rgba(255,255,255,${r.life * 0.8})`; ctx.lineWidth = 3;
+    ctx.strokeRect(r.x - g * 14, r.y - BH / 2 - g * 10, r.w + g * 28, BH + g * 20);
+  }
+  for (const p of particles) {                        // particules
+    ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.c;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center'; ctx.font = 'bold 18px system-ui, sans-serif';
+  for (const f of floats) {                           // textes qui montent
+    ctx.globalAlpha = Math.max(0, f.life); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 /* ================= ENTRÉES ================= */
@@ -405,6 +478,12 @@ const TRACKS = [
   { n: 'Énergie', chords: [[57,60,64],[55,59,62],[53,57,60],[52,56,59]],           arp: [0,2,1,2,0,2,1,2], bpm: 128, wave: 'sawtooth', vol: 0.025, mel: true }
 ];
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+TRACKS.push(
+  { n: 'Mystère',  chords: [[62,65,69],[58,62,65],[53,57,60],[48,52,55]],           arp: [0,1,2,1,2,1,0,1], bpm: 88,  wave: 'sine',     vol: 0.06,  mel: true },
+  { n: 'Aventure', chords: [[60,64,67],[55,59,62],[57,60,64],[53,57,60]],           arp: [0,2,1,2,0,2,1,2], bpm: 118, wave: 'square',   vol: 0.02,  mel: true,  drums: true },
+  { n: 'Océan',    chords: [[53,57,60,64],[52,55,59,62],[50,53,57,60],[48,52,55,59]], arp: [0,1,2,3,3,2,1,0], bpm: 70,  wave: 'sine',     vol: 0.06,  mel: false },
+  { n: 'Épique',   chords: [[52,55,59],[48,52,55],[55,59,62],[50,54,57]],           arp: [0,1,2,1,0,1,2,2], bpm: 138, wave: 'sawtooth', vol: 0.022, mel: true,  drums: true }
+);
 let musicTimer = null, nextT = 0, mStep = 0, musOpen = false;
 let trackIdx = 0;                       // 0..N = musique intégrée, -1 = fichier du joueur
 let customAudio = null, customUrl = null, customName = '';
@@ -434,6 +513,10 @@ function scheduler() {
     note(mtof(chord[T.arp[s]] + 12), nextT, eighth * 0.9, T.wave, T.vol);                    // arpège
     if (s % 2 === 0) note(mtof(chord[0] - 12), nextT, eighth * 1.8, 'sine', 0.09);           // basse
     if (T.mel && (s === 3 || s === 7)) note(mtof(chord[2] + 24), nextT, eighth * 0.6, 'square', 0.02); // mélodie
+    if (T.drums) {
+      if (s % 4 === 0) note(70, nextT, 0.14, 'sine', 0.16);          // grosse caisse
+      if (s % 2 === 1) note(7000, nextT, 0.03, 'square', 0.012);     // charleston
+    }
     nextT += eighth; mStep++;
   }
 }
@@ -526,20 +609,60 @@ const AV = [
   { n: 'Alien', c: '#b58bff', extra: '<line x1="36" y1="30" x2="28" y2="9" stroke="%c" stroke-width="4"/><circle cx="28" cy="8" r="6" fill="%c"/><line x1="64" y1="30" x2="72" y2="9" stroke="%c" stroke-width="4"/><circle cx="72" cy="8" r="6" fill="%c"/>' },
   { n: 'Dino',  c: '#5fd38d', extra: '<polygon points="30,28 37,8 44,26" fill="#ffb347"/><polygon points="44,26 51,5 58,26" fill="#ffb347"/><polygon points="58,26 65,8 72,28" fill="#ffb347"/>' }
 ];
+AV.push(
+  { n: 'Panda',    c: '#f5f5f5', ec: '#fff', extra: '<circle cx="24" cy="28" r="12" fill="#222"/><circle cx="76" cy="28" r="12" fill="#222"/>',
+    face: '<ellipse cx="37" cy="54" rx="9" ry="11" fill="#222" transform="rotate(20 37 54)"/><ellipse cx="63" cy="54" rx="9" ry="11" fill="#222" transform="rotate(-20 63 54)"/>' },
+  { n: 'Renard',   c: '#ff8c42', extra: '<polygon points="20,42 22,6 46,26" fill="%c"/><polygon points="80,42 78,6 54,26" fill="%c"/>',
+    face: '<ellipse cx="50" cy="74" rx="20" ry="13" fill="#fff"/>' },
+  { n: 'Hibou',    c: '#a8744f', extra: '<polygon points="22,38 20,10 42,26" fill="%c"/><polygon points="78,38 80,10 58,26" fill="%c"/>',
+    face: '<circle cx="37" cy="54" r="14" fill="#fff"/><circle cx="63" cy="54" r="14" fill="#fff"/><polygon points="45,64 55,64 50,75" fill="#ffb347"/>' },
+  { n: 'Pingouin', c: '#2b3a67', ec: '#fff', extra: '',
+    face: '<ellipse cx="50" cy="74" rx="22" ry="15" fill="#fff"/><polygon points="44,64 56,64 50,74" fill="#ffb347"/>' },
+  { n: 'Monstre',  c: '#ff6b81', extra: '<polygon points="26,34 22,8 42,28" fill="#ffd86b"/><polygon points="74,34 78,8 58,28" fill="#ffd86b"/>' },
+  { n: 'Chien',    c: '#d9a066', extra: '<ellipse cx="18" cy="52" rx="10" ry="22" fill="#8b5a2b"/><ellipse cx="82" cy="52" rx="10" ry="22" fill="#8b5a2b"/>',
+    face: '<ellipse cx="50" cy="64" rx="6" ry="4" fill="#222"/>' }
+);
+
+/* ---- Photo du joueur comme avatar (reste sur l'appareil) ---- */
+function photoImg(src, size, cls) {
+  return `<img class="av ph ${cls || ''}" src="${src}" width="${size}" height="${size}" alt="">`;
+}
+function processPhoto(file, cb) {            // recadre en carré 96x96 et compresse
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const s = Math.min(img.width, img.height), c = document.createElement('canvas');
+        c.width = c.height = 96;
+        c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 96, 96);
+        cb(c.toDataURL('image/jpeg', 0.8));
+      } catch (e) { cb(''); }
+    };
+    img.onerror = () => cb('');
+    img.src = reader.result;
+  };
+  reader.onerror = () => cb('');
+  reader.readAsDataURL(file);
+}
+
 function avatarSVG(k, size, cls) {
-  const a = AV[k | 0] || AV[0];
+  if (k === -1 && playerPhoto) return photoImg(playerPhoto, size, cls);
+  const a = AV[k | 0] || AV[0], ec = a.ec || '#222';
   const body = a.square
     ? `<rect x="14" y="26" width="72" height="66" rx="14" fill="${a.c}"/>`
     : `<ellipse cx="50" cy="58" rx="38" ry="34" fill="${a.c}"/>`;
   return `<svg class="av ${cls || ''}" width="${size}" height="${size}" viewBox="0 0 100 100">` +
-    a.extra.replace(/%c/g, a.c) + body +
-    `<ellipse class="eye" cx="37" cy="54" rx="5" ry="7" fill="#222"/><ellipse class="eye" cx="63" cy="54" rx="5" ry="7" fill="#222"/>` +
+    a.extra.replace(/%c/g, a.c) + body + (a.face || '') +
+    `<ellipse class="eye" cx="37" cy="54" rx="5" ry="7" fill="${ec}"/><ellipse class="eye" cx="63" cy="54" rx="5" ry="7" fill="${ec}"/>` +
     `<circle cx="27" cy="68" r="5" fill="#ff9db0" opacity=".7"/><circle cx="73" cy="68" r="5" fill="#ff9db0" opacity=".7"/>` +
     `<path class="m-happy" d="M40 70 Q50 80 60 70" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>` +
     `<path class="m-sad" d="M40 78 Q50 68 60 78" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`;
 }
+let playerPhoto = '', pickPhoto = '';
+try { const p = localStorage.getItem('stackrush_photo') || ''; if (p.indexOf('data:image/jpeg;base64,') === 0) playerPhoto = p; } catch (e) {}
 let playerAvatar = 0;
-try { const k = parseInt(localStorage.getItem('stackrush_avatar') || '0', 10); if (k >= 0 && k < AV.length) playerAvatar = k; } catch (e) {}
+try { const k = parseInt(localStorage.getItem('stackrush_avatar') || '0', 10); if ((k >= 0 && k < AV.length) || (k === -1 && playerPhoto)) playerAvatar = k; } catch (e) {}
 let pickAv = playerAvatar;
 function setHudAv(cls) {                       // réaction de l'avatar : 'happy' (parfait), 'sad' (perdu), '' (normal)
   const s = $('hudAv').firstChild; if (!s) return;
@@ -551,10 +674,18 @@ function setHudAv(cls) {                       // réaction de l'avatar : 'happy
 }
 function buildAvPicker() {
   const box = $('avPick'); box.textContent = '';
+  {                                           // case "ma photo" en premier
+    const src = pickPhoto || playerPhoto;
+    const pb = document.createElement('button');
+    pb.className = 'sw2' + (pickAv === -1 ? ' on' : ''); pb.title = 'Ma photo';
+    pb.innerHTML = src ? photoImg(src, 46, pickAv === -1 ? '' : 'still') : '<span style="font-size:26px">📷</span>';
+    pb.onclick = () => { if (src) { pickAv = -1; buildAvPicker(); } else $('photoFile').click(); };
+    box.appendChild(pb);
+  }
   AV.forEach((a, k) => {
     const b = document.createElement('button');
     b.className = 'sw2' + (k === pickAv ? ' on' : ''); b.title = a.n;
-    b.innerHTML = avatarSVG(k, 52, k === pickAv ? '' : 'still');
+    b.innerHTML = avatarSVG(k, 46, k === pickAv ? '' : 'still');
     b.onclick = () => { pickAv = k; buildAvPicker(); };
     box.appendChild(b);
   });
@@ -581,7 +712,7 @@ function askName() {
   elStart.classList.add('hidden'); elOver.classList.add('hidden');
   $('name').classList.remove('hidden');
   $('nameInput').value = playerName; $('namePrev').textContent = playerName; $('nameErr').textContent = '';
-  pickAv = playerAvatar; buildAvPicker();
+  pickAv = playerAvatar; pickPhoto = ''; buildAvPicker();
   setTimeout(() => $('nameInput').focus(), 50);
 }
 $('nameInput').oninput = () => {
@@ -594,10 +725,25 @@ $('btnNameOk').onclick = () => {
   const n = fmtName($('nameInput').value);
   if (n.length < 3) { $('nameErr').textContent = 'Minimum 3 caractères (lettres, chiffres ou _).'; return; }
   playerName = n; playerAvatar = pickAv;
+  if (pickAv === -1 && pickPhoto) {
+    playerPhoto = pickPhoto;
+    try { localStorage.setItem('stackrush_photo', playerPhoto); } catch (e) {}
+  }
+  pickPhoto = '';
   try { localStorage.setItem('stackrush_avatar', String(pickAv)); } catch (e) {}
   try { localStorage.setItem('stackrush_name', n); } catch (e) {}
   refreshPseudo(); refreshBest();
   $('name').classList.add('hidden'); elStart.classList.remove('hidden');
+};
+$('btnPhoto').onclick = () => $('photoFile').click();
+$('photoFile').onchange = e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f || !/^image\//.test(f.type)) return;
+  processPhoto(f, d => {
+    if (!d) { $('nameErr').textContent = 'Photo illisible, essaie une autre image.'; return; }
+    pickPhoto = d; pickAv = -1; $('nameErr').textContent = ''; buildAvPicker();
+  });
 };
 $('btnChangeName').onclick = askName;
 refreshPseudo();
@@ -607,7 +753,7 @@ function localScores() {
 }
 async function submitScore(s) {
   if (s < 1) return;
-  const entry = { name: getName(), av: playerAvatar, score: s, t: Date.now() };
+  const entry = { name: getName(), av: playerAvatar < 0 ? 0 : playerAvatar, score: s, t: Date.now() };
   if (FIREBASE_DB_URL) {
     try { await fetch(FIREBASE_DB_URL + '/scores.json', { method: 'POST', body: JSON.stringify(entry) }); } catch (e) {}
   } else {
